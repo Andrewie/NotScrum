@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: notscrum-backend
+    volumes:
+      - ./backend:/app
+      - notscrum_sqlite_data:/app/instance
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_APP=wsgi.py
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+    command: >
+      sh -c "chmod +x /app/init_db.sh &&
+             flask run --host=0.0.0.0 &
+             sleep 5 &&
+             ./init_db.sh"
+
+  frontend:
+    build: ./frontend
+    container_name: notscrum-frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - REACT_APP_API_URL=http://backend:5000/api
+    # Add healthcheck to ensure backend is ready before frontend tries to connect
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://backend:5000/api/boards"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+volumes:
+  notscrum_sqlite_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: E:/DEV/NotScrum/docker_volumes/sqlite_data
