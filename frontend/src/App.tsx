@@ -15,8 +15,10 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchBoards = async () => {
       try {
+        console.log('Attempting to fetch boards...'); // Debug log
         setLoading(true);
         const data = await getBoards();
+        console.log('Boards fetched successfully:', data); // Debug log
         setBoards(data);
         
         // Select the first board by default if none is selected
@@ -26,15 +28,15 @@ const App: React.FC = () => {
         
         setError(null);
       } catch (err) {
+        console.error('Error fetching boards:', err); // Debug log with detailed error
         setError('Failed to fetch boards. Please try again later.');
-        console.error(err);
       } finally {
         setLoading(false);
       }
     };
     
     fetchBoards();
-  }, [selectedBoardId]);
+  }, []); // Remove selectedBoardId from dependency array
 
   const handleBoardSelect = (boardId: number) => {
     setSelectedBoardId(boardId);

@@ -1,18 +1,9 @@
-import axios from 'axios';
+import axios, { AxiosResponse, AxiosError } from 'axios';
 import { Board, Lane, Card } from '../types';
 
-// Use window.location.origin to determine if we're in browser or production
-// In development, the React app is served at localhost:3000 and needs to connect to localhost:5000
-// In Docker container communication, we use the service name
-const API_BASE = process.env.NODE_ENV === 'production' 
-  ? process.env.REACT_APP_API_URL 
-  : 'http://localhost:5000/api';
-
-// If we're accessing through a browser, use the browser's origin
-const isBrowser = typeof window !== 'undefined';
-const API_URL = isBrowser && window.location.hostname === 'localhost' 
-  ? 'http://localhost:5000/api'
-  : API_BASE;
+// Get the API URL from environment variables, with a fallback
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+console.log('API URL being used:', API_URL); // Debug log to see what URL is being used
 
 const api = axios.create({
   baseURL: API_URL,
@@ -20,6 +11,51 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Add an interceptor to retry failed requests
+const MAX_RETRIES = 5;
+const RETRY_DELAY = 2000; // 2 seconds
+
+async function retryRequest(error: any, retryCount = 0): Promise<AxiosResponse> {
+  console.log('Retry request called with error:', error); // Debug log for retries
+  const request = error.config;
+  
+  // If we've already tried the maximum number of times, throw the error
+  if (retryCount >= MAX_RETRIES) {
+    console.error(`Failed after ${MAX_RETRIES} retries:`, error);
+    return Promise.reject(error);
+  }
+  
+  // Wait before retrying
+  await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+  console.log(`Retrying request (${retryCount + 1}/${MAX_RETRIES}): ${request.url}`);
+  
+  // Try again with incremented retry count
+  try {
+    const response = await axios(request);
+    // If we get a successful response, return it and stop retrying
+    if (response.status >= 200 && response.status < 300) {
+      console.log(`Request successful after ${retryCount + 1} retries: ${request.url}`);
+      return response;
+    }
+    return response;
+  } catch (newError) {
+    return retryRequest(newError, retryCount + 1);
+  }
+}
+
+// Add response interceptor to handle retry
+api.interceptors.response.use(
+  (response: AxiosResponse) => response,
+  (error: AxiosError) => {
+    // Only retry if server is not available or internal server error
+    if (!error.response || error.response.status >= 500) {
+      console.log(`Backend not ready, retrying request: ${error.config?.url}`);
+      return retryRequest(error);
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Board API calls
 export const getBoards = async (): Promise<Board[]> => {

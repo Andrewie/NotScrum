@@ -18,19 +18,31 @@ services:
       sh -c "chmod +x /app/init_db.sh &&
              ./init_db.sh &&
              flask run --host=0.0.0.0"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/boards')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   frontend:
     build: ./frontend
     container_name: notscrum-frontend
+    # Improved volume configuration
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
     ports:
       - "3000:3000"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
       - REACT_APP_API_URL=http://localhost:5000/api
+      - WDS_SOCKET_PORT=3000
+      - CHOKIDAR_USEPOLLING=true
+    stdin_open: true
+    tty: true
 
 volumes:
   notscrum_sqlite_data:

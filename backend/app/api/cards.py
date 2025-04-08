@@ -3,6 +3,7 @@ from app import db
 from app.api import bp
 from app.models.card import Card
 from app.models.lane import Lane
+from datetime import datetime
 
 @bp.route('/cards', methods=['GET'])
 def get_cards():
@@ -35,12 +36,20 @@ def create_card(lane_id):
     else:
         position = data['position']
     
+    # Handle due_date if provided
+    due_date = None
+    if 'due_date' in data and data['due_date']:
+        try:
+            due_date = datetime.fromisoformat(data['due_date'].replace('Z', '+00:00'))
+        except ValueError:
+            return jsonify({'error': 'Invalid date format for due_date. Use ISO format (YYYY-MM-DDTHH:MM:SS.sssZ)'}), 400
+    
     card = Card(
         title=data['title'],
         description=data.get('description', ''),
         color=data.get('color', 'white'),
         position=position,
-        due_date=data.get('due_date'),
+        due_date=due_date,
         lane_id=lane_id
     )
     
@@ -62,7 +71,14 @@ def update_card(id):
     if 'position' in data:
         card.position = data['position']
     if 'due_date' in data:
-        card.due_date = data['due_date']
+        # Handle due_date if provided
+        if data['due_date']:
+            try:
+                card.due_date = datetime.fromisoformat(data['due_date'].replace('Z', '+00:00'))
+            except ValueError:
+                return jsonify({'error': 'Invalid date format for due_date. Use ISO format (YYYY-MM-DDTHH:MM:SS.sssZ)'}), 400
+        else:
+            card.due_date = None
     if 'lane_id' in data:
         # Verify lane exists before moving card
         lane = Lane.query.get_or_404(data['lane_id'])
