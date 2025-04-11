@@ -1,41 +1,44 @@
+import os
 from flask import Flask
+from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-from flask_cors import CORS
-import os
 
-# Initialize extensions
 db = SQLAlchemy()
 migrate = Migrate()
 
-def create_app():
-    # Create and configure the app
+def create_app(test_config=None):
+    """Create and configure the Flask app"""
     app = Flask(__name__, instance_relative_config=True)
     
-    # Configure the SQLite database
+    # Configure the app
     app.config.from_mapping(
-        SECRET_KEY=os.environ.get('SECRET_KEY', 'dev_key'),
-        SQLALCHEMY_DATABASE_URI='sqlite:///' + os.path.join(app.instance_path, 'notscrum.sqlite'),
-        SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        SECRET_KEY=os.environ.get('SECRET_KEY', 'dev'),
+        SQLALCHEMY_DATABASE_URI=os.environ.get('DATABASE_URL', 'sqlite:///notscrum.sqlite'),
+        SQLALCHEMY_TRACK_MODIFICATIONS=False
     )
-
+    
+    # Enable CORS for all routes
+    CORS(app)
+    
+    # Initialize extensions
+    db.init_app(app)
+    migrate.init_app(app, db)
+    
     # Ensure the instance folder exists
     try:
         os.makedirs(app.instance_path)
     except OSError:
         pass
     
-    # Initialize extensions with app
-    db.init_app(app)
-    migrate.init_app(app, db)
-    CORS(app)
+    # Register API blueprints
+    from .api import boards, lanes, cards
+    app.register_blueprint(boards.bp)
+    app.register_blueprint(lanes.bp)
+    app.register_blueprint(cards.bp)
     
-    # Register blueprints
-    from app.api import bp as api_bp
-    app.register_blueprint(api_bp, url_prefix='/api')
-    
-    @app.route('/health')
-    def health_check():
-        return {'status': 'ok'}
+    # Configure Swagger UI
+    from .api.swagger import configure_swagger
+    configure_swagger(app)
     
     return app

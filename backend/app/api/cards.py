@@ -1,150 +1,105 @@
-from flask import jsonify, request
-from app import db
-from app.api import bp
-from app.models.card import Card
-from app.models.lane import Lane
-from datetime import datetime
+from flask import Blueprint, jsonify, request
+from .. import db
+from ..models.card import Card
+
+bp = Blueprint('cards', __name__, url_prefix='/api')
 
 @bp.route('/cards', methods=['GET'])
-def get_cards():
+def get_all_cards():
+    """Get all cards"""
     cards = Card.query.all()
-    return jsonify([card.to_dict() for card in cards])
+    return jsonify([card.to_dict() for card in cards]), 200
 
-@bp.route('/lanes/<int:lane_id>/cards', methods=['GET'])
-def get_lane_cards(lane_id):
-    lane = Lane.query.get_or_404(lane_id)
-    cards = Card.query.filter_by(lane_id=lane_id).order_by(Card.position).all()
-    return jsonify([card.to_dict() for card in cards])
-
-@bp.route('/cards/<int:id>', methods=['GET'])
-def get_card(id):
-    card = Card.query.get_or_404(id)
-    return jsonify(card.to_dict())
-
-@bp.route('/lanes/<int:lane_id>/cards', methods=['POST'])
-def create_card(lane_id):
-    lane = Lane.query.get_or_404(lane_id)
-    data = request.get_json() or {}
+@bp.route('/cards', methods=['POST'])
+def create_card():
+    """Create a new card"""
+    data = request.get_json()
     
-    if 'title' not in data:
-        return jsonify({'error': 'Missing required field: title'}), 400
+    if not data or 'title' not in data or 'lane_id' not in data:
+        return jsonify({'error': 'Title and lane_id are required'}), 400
     
-    # If position is not specified, add to the end
-    if 'position' not in data:
-        max_position = db.session.query(db.func.max(Card.position)).filter_by(lane_id=lane_id).scalar() or -1
-        position = max_position + 1
-    else:
-        position = data['position']
-    
-    # Handle due_date if provided
-    due_date = None
-    if 'due_date' in data and data['due_date']:
-        try:
-            due_date = datetime.fromisoformat(data['due_date'].replace('Z', '+00:00'))
-        except ValueError:
-            return jsonify({'error': 'Invalid date format for due_date. Use ISO format (YYYY-MM-DDTHH:MM:SS.sssZ)'}), 400
+    # Find the highest position in the lane
+    max_position = db.session.query(db.func.max(Card.position)).filter_by(
+        lane_id=data.get('lane_id')).scalar() or 0
     
     card = Card(
-        title=data['title'],
+        title=data.get('title'),
         description=data.get('description', ''),
-        color=data.get('color', 'white'),
-        position=position,
-        due_date=due_date,
-        lane_id=lane_id
+        lane_id=data.get('lane_id'),
+        position=max_position + 1,
+        color=data.get('color', 'white')
     )
     
     db.session.add(card)
     db.session.commit()
+    
     return jsonify(card.to_dict()), 201
 
-@bp.route('/cards/<int:id>', methods=['PUT'])
-def update_card(id):
-    card = Card.query.get_or_404(id)
-    data = request.get_json() or {}
+@bp.route('/lanes/<int:lane_id>/cards', methods=['GET'])
+def get_cards_by_lane(lane_id):
+    """Get all cards for a specific lane"""
+    cards = Card.query.filter_by(lane_id=lane_id).order_by(Card.position).all()
+    return jsonify([card.to_dict() for card in cards]), 200
+
+@bp.route('/lanes/<int:lane_id>/cards', methods=['POST'])
+def create_card_in_lane(lane_id):
+    """Create a new card in a specific lane"""
+    data = request.get_json()
     
-    if 'title' in data:
-        card.title = data['title']
-    if 'description' in data:
-        card.description = data['description']
-    if 'color' in data:
-        card.color = data['color']
-    if 'position' in data:
-        card.position = data['position']
-    if 'due_date' in data:
-        # Handle due_date if provided
-        if data['due_date']:
-            try:
-                card.due_date = datetime.fromisoformat(data['due_date'].replace('Z', '+00:00'))
-            except ValueError:
-                return jsonify({'error': 'Invalid date format for due_date. Use ISO format (YYYY-MM-DDTHH:MM:SS.sssZ)'}), 400
-        else:
-            card.due_date = None
-    if 'lane_id' in data:
-        # Verify lane exists before moving card
-        lane = Lane.query.get_or_404(data['lane_id'])
-        card.lane_id = data['lane_id']
+    if not data or 'title' not in data:
+        return jsonify({'error': 'Title is required'}), 400
+    
+    # Find the highest position in the lane
+    max_position = db.session.query(db.func.max(Card.position)).filter_by(
+        lane_id=lane_id).scalar() or 0
+    
+    card = Card(
+        title=data.get('title'),
+        description=data.get('description', ''),
+        lane_id=lane_id,
+        position=max_position + 1,
+        color=data.get('color', 'white')
+    )
+    
+    db.session.add(card)
+    db.session.commit()
+    
+    return jsonify(card.to_dict()), 201
+
+@bp.route('/cards/<int:card_id>', methods=['GET'])
+def get_card(card_id):
+    """Get a card by ID"""
+    card = Card.query.get_or_404(card_id)
+    return jsonify(card.to_dict()), 200
+
+@bp.route('/cards/<int:card_id>', methods=['PUT'])
+def update_card(card_id):
+    """Update a card"""
+    card = Card.query.get_or_404(card_id)
+    data = request.get_json()
+    
+    if data.get('title'):
+        card.title = data.get('title')
+    if data.get('description') is not None:
+        card.description = data.get('description')
+    if data.get('lane_id') is not None:
+        card.lane_id = data.get('lane_id')
+    if data.get('position') is not None:
+        card.position = data.get('position')
+    if data.get('color'):
+        card.color = data.get('color')
+    if data.get('due_date') is not None:
+        card.due_date = data.get('due_date')
     
     db.session.commit()
-    return jsonify(card.to_dict())
+    
+    return jsonify(card.to_dict()), 200
 
-@bp.route('/cards/<int:id>', methods=['DELETE'])
-def delete_card(id):
-    card = Card.query.get_or_404(id)
+@bp.route('/cards/<int:card_id>', methods=['DELETE'])
+def delete_card(card_id):
+    """Delete a card"""
+    card = Card.query.get_or_404(card_id)
     db.session.delete(card)
     db.session.commit()
-    return '', 204
-
-@bp.route('/lanes/<int:lane_id>/cards/reorder', methods=['PUT'])
-def reorder_cards(lane_id):
-    lane = Lane.query.get_or_404(lane_id)
-    data = request.get_json() or {}
     
-    if 'card_order' not in data:
-        return jsonify({'error': 'Missing required field: card_order'}), 400
-    
-    card_order = data['card_order']
-    
-    # Update positions
-    for index, card_id in enumerate(card_order):
-        card = Card.query.get_or_404(card_id)
-        if card.lane_id != lane_id:
-            return jsonify({'error': f'Card {card_id} does not belong to lane {lane_id}'}), 400
-        card.position = index
-    
-    db.session.commit()
-    cards = Card.query.filter_by(lane_id=lane_id).order_by(Card.position).all()
-    return jsonify([card.to_dict() for card in cards])
-
-@bp.route('/cards/<int:id>/move', methods=['PUT'])
-def move_card(id):
-    card = Card.query.get_or_404(id)
-    data = request.get_json() or {}
-    
-    if 'lane_id' not in data:
-        return jsonify({'error': 'Missing required field: lane_id'}), 400
-    
-    target_lane_id = data['lane_id']
-    target_position = data.get('position')
-    
-    # Verify the target lane exists
-    target_lane = Lane.query.get_or_404(target_lane_id)
-    
-    # If position is not specified, add to the end
-    if target_position is None:
-        max_position = db.session.query(db.func.max(Card.position)).filter_by(lane_id=target_lane_id).scalar() or -1
-        target_position = max_position + 1
-    
-    card.lane_id = target_lane_id
-    card.position = target_position
-    
-    # Reorder cards in the target lane
-    if 'card_order' in data:
-        card_order = data['card_order']
-        for index, card_id in enumerate(card_order):
-            c = Card.query.get_or_404(card_id)
-            if c.lane_id != target_lane_id:
-                return jsonify({'error': f'Card {card_id} does not belong to lane {target_lane_id}'}), 400
-            c.position = index
-    
-    db.session.commit()
-    return jsonify(card.to_dict())
+    return jsonify({'message': 'Card deleted successfully'}), 200

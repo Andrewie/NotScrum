@@ -1,20 +1,17 @@
-# Simple Project Board
+# Simple Project Board (Backend)
 
-A simple, docker-based Kanban board application with drag-and-drop functionality, resembling post-it notes on a board.
+A simple, docker-based Kanban board application with a RESTful API backend. This repository contains only the backend service, the frontend is now hosted separately.
 
 ## Features
 
-- Drag and drop cards between lanes
-- Create, edit, and delete cards and lanes
-- Color-coded cards
-- Optional due dates for cards
-- Simple and intuitive interface
-- Mobile-responsive design
+- RESTful API for managing boards, lanes, and cards
+- SQLite database for data persistence
+- Docker containerization for easy deployment
+- Complete API for Kanban board operations
 
 ## Technology Stack
 
 - **Backend**: Python with Flask, SQLite database
-- **Frontend**: React with TypeScript, TailwindCSS
 - **Deployment**: Docker and Docker Compose
 
 ## Getting Started
@@ -32,14 +29,14 @@ A simple, docker-based Kanban board application with drag-and-drop functionality
    cd notscrum
    ```
 
-2. Start the application using Docker Compose:
+2. Start the backend service using Docker Compose:
    ```
    docker-compose up -d
    ```
 
-3. Access the application in your browser:
+3. The backend API will be available at:
    ```
-   http://localhost:3000
+   http://localhost:5000/api
    ```
 
 ### Development Setup
@@ -76,23 +73,6 @@ If you want to set up the development environment without Docker:
    flask run
    ```
 
-#### Frontend Setup
-
-1. Navigate to the frontend directory:
-   ```
-   cd frontend
-   ```
-
-2. Install dependencies:
-   ```
-   npm install
-   ```
-
-3. Start the development server:
-   ```
-   npm start
-   ```
-
 ## API Documentation
 
 The backend provides a RESTful API for managing boards, lanes, and cards.
@@ -126,19 +106,10 @@ The backend provides a RESTful API for managing boards, lanes, and cards.
 - `PUT /api/lanes/<lane_id>/cards/reorder` - Reorder cards in a lane
 - `PUT /api/cards/<id>/move` - Move a card to a different lane
 
-## Data Export
-
-To export your board data:
-
-1. Navigate to a board
-2. Click on the "Export" button
-3. Choose between JSON or CSV format
-
 ## License
 
 [MIT License](LICENSE)
 
 ## Acknowledgements
 
-- This project uses [React Beautiful DnD](https://github.com/atlassian/react-beautiful-dnd) for drag-and-drop functionality
-- Built with [Flask](https://flask.palletsprojects.com/) and [React](https://reactjs.org/)
+- Built with [Flask](https://flask.palletsprojects.com/)
